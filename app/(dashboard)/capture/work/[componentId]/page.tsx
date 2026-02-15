@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { apiUrl } from "@/lib/api-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,7 +120,7 @@ export default function CaptureWorkPage() {
 
   useEffect(() => {
     async function fetchComponent() {
-      const res = await fetch(`/api/components/${params.componentId}`);
+      const res = await fetch(apiUrl(`/api/components/${params.componentId}`));
       if (res.ok) {
         setComponent(await res.json());
       }
@@ -313,8 +314,8 @@ export default function CaptureWorkPage() {
 
     try {
       const [form8130Res, workOrderRes] = await Promise.all([
-        fetch("/api/ai/generate-8130", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
-        fetch("/api/ai/generate-workorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+        fetch(apiUrl("/api/ai/generate-8130"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
+        fetch(apiUrl("/api/ai/generate-workorder"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
       ]);
       const form8130 = await form8130Res.json();
       const workOrder = await workOrderRes.json();
@@ -402,12 +403,12 @@ export default function CaptureWorkPage() {
     try {
       // Call both AI routes in parallel for speed
       const [form8130Res, workOrderRes] = await Promise.all([
-        fetch("/api/ai/generate-8130", {
+        fetch(apiUrl("/api/ai/generate-8130"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }),
-        fetch("/api/ai/generate-workorder", {
+        fetch(apiUrl("/api/ai/generate-workorder"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

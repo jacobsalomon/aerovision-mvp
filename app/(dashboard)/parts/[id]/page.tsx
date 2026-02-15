@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { apiUrl } from "@/lib/api-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge, SeverityBadge } from "@/components/shared/status-badge";
@@ -547,11 +548,11 @@ export default function PartDetailPage() {
   // Fetch component data and exceptions on mount
   useEffect(() => {
     async function fetchComponent() {
-      const res = await fetch(`/api/components/${params.id}`);
+      const res = await fetch(apiUrl(`/api/components/${params.id}`));
       if (res.ok) {
         setComponent(await res.json());
       }
-      const exRes = await fetch(`/api/exceptions?componentId=${params.id}`);
+      const exRes = await fetch(apiUrl(`/api/exceptions?componentId=${params.id}`));
       if (exRes.ok) {
         setExceptions(await exRes.json());
       }
@@ -564,8 +565,8 @@ export default function PartDetailPage() {
   async function scanForExceptions() {
     setScanningExceptions(true);
     try {
-      await fetch(`/api/exceptions/scan/${params.id}`, { method: "POST" });
-      const exRes = await fetch(`/api/exceptions?componentId=${params.id}`);
+      await fetch(apiUrl(`/api/exceptions/scan/${params.id}`), { method: "POST" });
+      const exRes = await fetch(apiUrl(`/api/exceptions?componentId=${params.id}`));
       if (exRes.ok) {
         setExceptions(await exRes.json());
       }
@@ -578,7 +579,7 @@ export default function PartDetailPage() {
   async function exportTracePdf() {
     setExportingPdf(true);
     try {
-      const res = await fetch(`/api/export/trace/${params.id}`);
+      const res = await fetch(apiUrl(`/api/export/trace/${params.id}`));
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -599,7 +600,7 @@ export default function PartDetailPage() {
   async function downloadDocument(docId: string, title: string) {
     setDownloadingDoc(docId);
     try {
-      const res = await fetch(`/api/documents/download/${docId}`);
+      const res = await fetch(apiUrl(`/api/documents/download/${docId}`));
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);

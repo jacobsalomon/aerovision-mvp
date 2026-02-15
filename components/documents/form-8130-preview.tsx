@@ -11,6 +11,7 @@ import {
   EyeOff,
   Loader2,
 } from "lucide-react";
+import { apiUrl } from "@/lib/api-url";
 
 // ─── TYPES ─────────────────────────────────────────────────
 // The 8130-3 data shape returned by /api/ai/generate-8130.
@@ -162,7 +163,7 @@ export default function Form8130Preview({
   async function handleDownload() {
     setDownloading(true);
     try {
-      const res = await fetch("/api/documents/render-8130-pdf", {
+      const res = await fetch(apiUrl("/api/documents/render-8130-pdf"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data, componentId }),

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { apiUrl } from "@/lib/api-url";
 import {
   Table,
   TableBody,
@@ -66,7 +67,7 @@ export default function DashboardPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (statusFilter !== "all") params.set("status", statusFilter);
-      const res = await fetch(`/api/components?${params}`);
+      const res = await fetch(apiUrl(`/api/components?${params}`));
       const data = await res.json();
       setComponents(data);
       setLoading(false);
