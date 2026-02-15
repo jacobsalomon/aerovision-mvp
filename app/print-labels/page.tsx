@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { apiUrl } from "@/lib/api-url";
 
 // Each component from our database gets a printable label with a QR code.
 // These labels get printed, cut out, and taped to physical objects during
@@ -22,7 +23,7 @@ export default function PrintLabelsPage() {
   // Fetch all seed components from our API
   useEffect(() => {
     async function fetchComponents() {
-      const res = await fetch("/api/components");
+      const res = await fetch(apiUrl("/api/components"));
       const data = await res.json();
       setComponents(data);
       setLoading(false);

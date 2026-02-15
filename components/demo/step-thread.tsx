@@ -34,6 +34,7 @@ import {
   FileText,
   Hash,
 } from "lucide-react";
+import { apiUrl } from "@/lib/api-url";
 
 // ─── TYPES ───────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ export default function StepThread({ active }: StepThreadProps) {
     setError(false);
     try {
       // Step 1: Get component IDs by serial number
-      const listRes = await fetch("/api/components");
+      const listRes = await fetch(apiUrl("/api/components"));
       const allComponents = await listRes.json();
       const clean = allComponents.find(
         (c: { serialNumber: string }) => c.serialNumber === "SN-2019-07842"
@@ -170,8 +171,8 @@ export default function StepThread({ active }: StepThreadProps) {
 
       // Step 2: Fetch full component data with events
       const [cleanRes, gappedRes] = await Promise.all([
-        fetch(`/api/components/${clean.id}`),
-        fetch(`/api/components/${gapped.id}`),
+        fetch(apiUrl(`/api/components/${clean.id}`)),
+        fetch(apiUrl(`/api/components/${gapped.id}`)),
       ]);
 
       const cleanData = await cleanRes.json();

@@ -30,6 +30,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import { apiUrl } from "@/lib/api-url";
 
 // ── Types ────────────────────────────────────────────
 
@@ -115,8 +116,8 @@ export default function IntegrityPage() {
   // Fetch both alerts and exceptions on page load
   const fetchData = useCallback(async () => {
     const [alertsRes, exceptionsRes] = await Promise.all([
-      fetch("/api/alerts"),
-      fetch("/api/exceptions"),
+      fetch(apiUrl("/api/alerts")),
+      fetch(apiUrl("/api/exceptions")),
     ]);
     setAlerts(await alertsRes.json());
     setExceptions(await exceptionsRes.json());
@@ -132,11 +133,11 @@ export default function IntegrityPage() {
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await fetch("/api/exceptions/scan-all", { method: "POST" });
+      const res = await fetch(apiUrl("/api/exceptions/scan-all"), { method: "POST" });
       const result = await res.json();
       setScanResult(result);
       // Refresh exception list after scan
-      const exceptionsRes = await fetch("/api/exceptions");
+      const exceptionsRes = await fetch(apiUrl("/api/exceptions"));
       setExceptions(await exceptionsRes.json());
     } finally {
       setScanning(false);
@@ -157,13 +158,13 @@ export default function IntegrityPage() {
     exceptionId: string,
     status: string
   ) {
-    await fetch(`/api/exceptions/${exceptionId}`, {
+    await fetch(apiUrl(`/api/exceptions/${exceptionId}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
     // Refresh data
-    const exceptionsRes = await fetch("/api/exceptions");
+    const exceptionsRes = await fetch(apiUrl("/api/exceptions"));
     setExceptions(await exceptionsRes.json());
   }
 

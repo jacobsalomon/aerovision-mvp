@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { apiUrl } from "@/lib/api-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +82,7 @@ export default function CapturePage() {
     setLookupError("");
     setLookupResult(null);
 
-    const res = await fetch(`/api/components?search=${encodeURIComponent(serialInput.trim())}`);
+    const res = await fetch(apiUrl(`/api/components?search=${encodeURIComponent(serialInput.trim())}`));
     const data = await res.json();
 
     if (data.length > 0) {
@@ -132,7 +133,7 @@ export default function CapturePage() {
     setExtractedData(null);
 
     try {
-      const res = await fetch("/api/ai/extract-document", {
+      const res = await fetch(apiUrl("/api/ai/extract-document"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64, mimeType }),
@@ -148,7 +149,7 @@ export default function CapturePage() {
       if (data.partNumber || data.serialNumber) {
         const searchTerm = data.partNumber || data.serialNumber;
         const lookupRes = await fetch(
-          `/api/components?search=${encodeURIComponent(searchTerm)}`
+          apiUrl(`/api/components?search=${encodeURIComponent(searchTerm)}`)
         );
         const lookupData = await lookupRes.json();
 

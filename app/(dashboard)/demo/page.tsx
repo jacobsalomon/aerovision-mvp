@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { apiUrl } from "@/lib/api-url";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -929,11 +930,11 @@ function StepIntelligence() {
   async function runScan() {
     setScanning(true);
     try {
-      const res = await fetch("/api/exceptions/scan-all", { method: "POST" });
+      const res = await fetch(apiUrl("/api/exceptions/scan-all"), { method: "POST" });
       const result = await res.json();
       setScanResult(result);
       // Fetch exception list
-      const exRes = await fetch("/api/exceptions");
+      const exRes = await fetch(apiUrl("/api/exceptions"));
       const exData = await exRes.json();
       setExceptions(exData.slice(0, 10)); // show top 10
     } catch {

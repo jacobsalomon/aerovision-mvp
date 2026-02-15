@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, User, BookOpen, Calendar } from "lucide-react";
+import { apiUrl } from "@/lib/api-url";
 
 interface KnowledgeEntry {
   id: string;
@@ -28,7 +29,7 @@ export default function KnowledgePage() {
     async function fetchEntries() {
       setLoading(true);
       const params = search ? `?search=${encodeURIComponent(search)}` : "";
-      const res = await fetch(`/api/knowledge${params}`);
+      const res = await fetch(apiUrl(`/api/knowledge${params}`));
       setEntries(await res.json());
       setLoading(false);
     }
