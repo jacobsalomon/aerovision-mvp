@@ -17,7 +17,7 @@
 2. **Prep for RecordSnap demo:** Have a photo of an 8130-3 form or any aerospace document saved on your desktop (or have a printed one ready to photograph if presenting from a tablet). This is for the document scanning feature in Section 3.
 3. Have your PowerPoint deck open in presenter mode on a separate display (or ready to pull up)
 4. Set Chrome zoom to **90%** so more fits on screen (Cmd + minus)
-5. Make sure the dev server is running: `cd ~/Desktop/Primary_OIR/AeroVision/MVP/aerotrack-mvp && npm run dev`
+5. Make sure the dev server is running: `cd ~/Desktop/Primary_OIR/MVC/MVP/aerovision-mvp && npm run dev`
 6. Hit the landing page once to warm up Tailwind CSS compilation
 
 ### PowerPoint Slides to Prepare

@@ -345,7 +345,7 @@ Think of this as an automated auditor that checks every part for problems:
 ## File Structure (Simplified)
 
 ```
-aerotrack-mvp/
+aerovision-mvp/
 │
 ├── app/                          ← All the pages you see in the browser
 │   ├── page.tsx                  ← Home/landing page

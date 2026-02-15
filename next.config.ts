@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Creates a minimal self-contained build — only includes files actually needed.
+  // Required for Docker/Railway/Fly.io deployment, and also speeds up the build
+  // because webpack has far less to trace through.
+  output: "standalone",
+
   // Tell Next.js NOT to bundle these packages — use them as-is at runtime.
   // This is critical for native modules (better-sqlite3) which contain
   // compiled C++ code that webpack can't process. Without this, the bundler
