@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import PasscodeGate from "@/components/PasscodeGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,7 +42,9 @@ gtag('config', 'G-ENBE6GFB86');`}
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <PasscodeGate>
+          {children}
+        </PasscodeGate>
         <Toaster />
       </body>
     </html>
