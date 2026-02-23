@@ -1,12 +1,11 @@
 // POST /api/mobile/evidence — Upload a piece of evidence (photo, video, audio chunk)
-// For PoC: stores files locally in /public/evidence/ instead of cloud storage
+// Uses Vercel Blob for cloud file storage (works in serverless environment)
 // Protected by API key authentication
 
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { put } from "@vercel/blob";
 import crypto from "crypto";
 
 // Max file size: 50MB (photos ~5MB, videos ~20MB, audio chunks ~5MB)
@@ -62,17 +61,18 @@ export async function POST(request: Request) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const fileHash = crypto.createHash("sha256").update(bytes).digest("hex");
 
-    // Store locally for PoC — in production this would go to R2
-    const evidenceDir = path.join(process.cwd(), "public", "evidence", sessionId);
-    await mkdir(evidenceDir, { recursive: true });
-
+    // Upload to Vercel Blob (cloud storage that works in serverless)
     const ext = file.name.split(".").pop() || "bin";
     const fileName = `${type.toLowerCase()}_${Date.now()}.${ext}`;
-    const filePath = path.join(evidenceDir, fileName);
-    await writeFile(filePath, bytes);
+    const blobPath = `evidence/${sessionId}/${fileName}`;
 
-    // URL path for accessing the file via Next.js static serving
-    const fileUrl = `/evidence/${sessionId}/${fileName}`;
+    const blob = await put(blobPath, Buffer.from(bytes), {
+      access: "public",
+      contentType: file.type || "application/octet-stream",
+    });
+
+    // blob.url is the permanent public URL for the file
+    const fileUrl = blob.url;
 
     // Save to database
     const evidence = await prisma.captureEvidence.create({
