@@ -6,8 +6,9 @@ import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 
 // Create a dedicated test database connection
+// Uses TURSO_DATABASE_URL if set (CI/vitest config), falls back to test.db
 const adapter = new PrismaLibSql({
-  url: "file:./test.db",
+  url: process.env.TURSO_DATABASE_URL ?? "file:./test.db",
 });
 
 export const testDb = new PrismaClient({ adapter });
