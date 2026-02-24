@@ -3,6 +3,9 @@
 // Returns extracted part numbers, serial numbers, and all visible text
 // Protected by API key authentication
 
+// Allow up to 30 seconds for image analysis via GPT-4o vision
+export const maxDuration = 30;
+
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import { NextResponse } from "next/server";

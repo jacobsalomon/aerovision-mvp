@@ -6,6 +6,9 @@
 // Returns word-level timestamps for searchable audio
 // Protected by API key authentication
 
+// Allow up to 30 seconds for audio transcription
+export const maxDuration = 30;
+
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import { transcribeWithFallback } from "@/lib/ai/openai";

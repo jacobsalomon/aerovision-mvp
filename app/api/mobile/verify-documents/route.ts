@@ -3,6 +3,9 @@
 // Checks each field against raw evidence, flags inconsistencies and unsupported fields
 // Protected by API key authentication
 
+// Allow up to 60 seconds for AI document verification
+export const maxDuration = 60;
+
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import { NextResponse } from "next/server";

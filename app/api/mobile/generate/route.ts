@@ -4,6 +4,9 @@
 // Determines which documents are needed (8130-3, 337, 8010-4) and generates them
 // Protected by API key authentication
 
+// Allow up to 60 seconds for GPT-4o document generation + verification
+export const maxDuration = 60;
+
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import { generateDocuments } from "@/lib/ai/openai";
@@ -186,10 +189,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // Update session status
+    // Update session status — only mark "documents_generated" if we actually produced documents.
+    // If AI couldn't determine what docs to generate, reset to "capture_complete" so user can retry.
+    const finalStatus =
+      savedDocuments.length > 0 ? "documents_generated" : "capture_complete";
     await prisma.captureSession.update({
       where: { id: sessionId },
-      data: { status: "documents_generated" },
+      data: { status: finalStatus },
     });
 
     // Audit log
@@ -246,8 +252,11 @@ export async function POST(request: Request) {
       success: true,
       data: {
         documents: savedDocuments,
-        summary: result.summary || "Documents generated",
-        sessionStatus: "documents_generated",
+        summary:
+          savedDocuments.length > 0
+            ? result.summary || "Documents generated"
+            : "No compliance documents could be determined from the captured evidence. You can retry after adding more evidence.",
+        sessionStatus: finalStatus,
         verification,
         evidenceSources: {
           photoExtractions: photoExtractions.length,
