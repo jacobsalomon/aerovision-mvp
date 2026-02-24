@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
+        signal: AbortSignal.timeout(25000),
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1024,
@@ -37,13 +38,23 @@ For each distinct finding or observation, extract:
 - measurements: { parameter, value, spec, passFail } if any, otherwise null
 - type: FINDING or ACTION (ACTION if they're just narrating what they're doing)
 
-Input transcription: "${transcription}"
-
+The transcription text will be provided in the next message. Structure it into findings.
 Return ONLY a JSON array of findings (no markdown code fences). If the speech is empty or unclear, return an empty array [].`,
+            },
+            {
+              role: "user",
+              content: transcription,
             },
           ],
         }),
       });
+
+      // Check for API errors before parsing
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        console.error(`Anthropic API error (status ${response.status}): ${errorBody.slice(0, 200)}`);
+        throw new Error(`Anthropic API returned status ${response.status}`);
+      }
 
       const aiResult = await response.json();
       const textContent = aiResult.content?.[0]?.text || "[]";

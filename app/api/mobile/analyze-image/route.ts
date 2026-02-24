@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { evidenceId, imageBase64, sessionId } = body;
+    const { evidenceId, imageBase64, sessionId, mimeType: bodyMimeType } = body;
 
     if (!imageBase64) {
       return NextResponse.json(
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${openaiKey}`,
           "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(25000),
         body: JSON.stringify({
           model: VISION_MODEL,
           messages: [
@@ -102,7 +103,7 @@ Be precise — these values go directly into FAA compliance documents.`,
                   image_url: {
                     url: imageBase64.startsWith("data:")
                       ? imageBase64
-                      : `data:image/jpeg;base64,${imageBase64}`,
+                      : `data:${bodyMimeType || "image/jpeg"};base64,${imageBase64}`,
                   },
                 },
               ],

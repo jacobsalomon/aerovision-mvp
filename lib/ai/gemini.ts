@@ -89,7 +89,8 @@ export async function uploadFileToGemini(
 
   if (!startResponse.ok) {
     const err = await startResponse.text();
-    throw new Error(`Gemini File API upload start failed: ${startResponse.status} ${err}`);
+    console.error(`Gemini upload start API error (${startResponse.status}):`, err.slice(0, 500));
+    throw new Error(`Gemini File API upload start failed (status ${startResponse.status})`);
   }
 
   const uploadUrl = startResponse.headers.get("X-Goog-Upload-URL");
@@ -108,7 +109,8 @@ export async function uploadFileToGemini(
 
   if (!uploadResponse.ok) {
     const err = await uploadResponse.text();
-    throw new Error(`Gemini File API upload failed: ${uploadResponse.status} ${err}`);
+    console.error(`Gemini upload API error (${uploadResponse.status}):`, err.slice(0, 500));
+    throw new Error(`Gemini File API upload failed (status ${uploadResponse.status})`);
   }
 
   const result = await uploadResponse.json();
@@ -165,6 +167,7 @@ export async function annotateVideoChunk(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(50000),
       body: JSON.stringify({
         contents: [
           {
@@ -212,7 +215,8 @@ Be thorough — this creates a permanent searchable index of maintenance footage
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Gemini annotation failed: ${response.status} ${err}`);
+    console.error(`Gemini annotation API error (${response.status}):`, err.slice(0, 500));
+    throw new Error(`Gemini annotation failed (status ${response.status})`);
   }
 
   const result = await response.json();
@@ -307,6 +311,7 @@ Be thorough and precise — this data feeds into FAA compliance documents.`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(50000),
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
@@ -319,7 +324,8 @@ Be thorough and precise — this data feeds into FAA compliance documents.`,
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Gemini deep analysis failed: ${response.status} ${err}`);
+    console.error(`Gemini deep analysis API error (${response.status}):`, err.slice(0, 500));
+    throw new Error(`Gemini deep analysis failed (status ${response.status})`);
   }
 
   const result = await response.json();
@@ -347,7 +353,10 @@ Be thorough and precise — this data feeds into FAA compliance documents.`,
 // ──────────────────────────────────────────────────────
 export async function deleteGeminiFile(fileName: string): Promise<void> {
   const apiKey = getApiKey();
-  await fetch(`${GEMINI_API_BASE}/v1beta/${fileName}?key=${apiKey}`, {
+  const response = await fetch(`${GEMINI_API_BASE}/v1beta/${fileName}?key=${apiKey}`, {
     method: "DELETE",
   });
+  if (!response.ok) {
+    console.warn(`Gemini file cleanup failed for ${fileName} (status ${response.status}) — may need manual cleanup`);
+  }
 }

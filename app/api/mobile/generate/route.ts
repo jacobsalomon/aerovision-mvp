@@ -9,20 +9,31 @@ export const maxDuration = 60;
 
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
+import { clampConfidence } from "@/lib/ai/utils";
 import { generateDocuments } from "@/lib/ai/openai";
 import {
   getReferenceDataForPart,
   formatReferenceDataForPrompt,
 } from "@/lib/reference-data";
+import { verifyDocuments } from "@/lib/ai/verify";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if ("error" in auth) return auth.error;
 
-  // Parse sessionId outside try so catch block can reset status on error
-  const body = await request.json();
-  const { sessionId } = body;
+  // Parse request body with its own error handling so malformed JSON
+  // returns 400 instead of crashing and leaving the session stuck
+  let sessionId: string;
+  try {
+    const body = await request.json();
+    sessionId = body.sessionId;
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid request body" },
+      { status: 400 }
+    );
+  }
 
   if (!sessionId) {
     return NextResponse.json(
@@ -63,6 +74,26 @@ export async function POST(request: Request) {
         { success: false, error: "No evidence captured in this session" },
         { status: 400 }
       );
+    }
+
+    // Check for existing documents to prevent duplicates on retry
+    const existingDocs = await prisma.documentGeneration2.findMany({
+      where: { sessionId },
+    });
+    if (existingDocs.length > 0) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        data: {
+          documents: existingDocs.map((doc) => ({
+            ...doc,
+            contentJson: JSON.parse(doc.contentJson),
+            lowConfidenceFields: JSON.parse(doc.lowConfidenceFields || "[]"),
+          })),
+          summary: "Documents already generated for this session",
+          sessionStatus: session.status,
+        },
+      });
     }
 
     // === Gather all evidence from the pipeline ===
@@ -180,7 +211,7 @@ export async function POST(request: Request) {
           documentType: doc.documentType,
           contentJson: JSON.stringify(doc.contentJson),
           status: "draft",
-          confidence: doc.confidence || 0,
+          confidence: clampConfidence(doc.confidence),
           lowConfidenceFields: JSON.stringify(doc.lowConfidenceFields || []),
         },
       });
@@ -225,23 +256,11 @@ export async function POST(request: Request) {
     });
 
     // === Auto-trigger verification (best-effort — don't fail generation if this breaks) ===
+    // Direct function call instead of HTTP self-call (more reliable on serverless)
     let verification = null;
     try {
-      const verifyUrl = new URL("/api/mobile/verify-documents", request.url);
-      const verifyResponse = await fetch(verifyUrl.toString(), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: request.headers.get("Authorization") || "",
-        },
-        body: JSON.stringify({ sessionId }),
-      });
-      if (verifyResponse.ok) {
-        const verifyResult = await verifyResponse.json();
-        if (verifyResult.success) {
-          verification = verifyResult.data?.verification || null;
-        }
-      }
+      const verifyResult = await verifyDocuments(sessionId, auth.technician.id);
+      verification = verifyResult.verification;
     } catch (verifyError) {
       // Verification is best-effort — log but don't fail
       console.warn(

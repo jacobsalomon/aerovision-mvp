@@ -9,6 +9,7 @@ export const maxDuration = 60;
 
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
+import { clampConfidence } from "@/lib/ai/utils";
 import {
   uploadFileToGemini,
   waitForFileProcessing,
@@ -59,6 +60,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check for existing annotations to prevent duplicates on retry
+    const existingAnnotations = await prisma.videoAnnotation.findMany({
+      where: { evidenceId },
+    });
+    if (existingAnnotations.length > 0) {
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        data: {
+          annotations: existingAnnotations,
+          annotationCount: existingAnnotations.length,
+          message: "Annotations already exist for this evidence",
+        },
+      });
+    }
+
     // Download the video file from Vercel Blob
     const fileResponse = await fetch(evidence.fileUrl);
     if (!fileResponse.ok) {
@@ -98,7 +115,7 @@ export async function POST(request: Request) {
           timestamp: annotation.timestamp,
           tag: annotation.tag,
           description: annotation.description,
-          confidence: annotation.confidence,
+          confidence: clampConfidence(annotation.confidence),
         },
       });
       savedAnnotations.push(saved);

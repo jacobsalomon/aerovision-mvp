@@ -92,11 +92,13 @@ export async function transcribeAudio(
       Authorization: `Bearer ${apiKey}`,
     },
     body: formData,
+    signal: AbortSignal.timeout(25000),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`OpenAI transcription failed: ${response.status} ${err}`);
+    console.error(`OpenAI transcription API error (${response.status}):`, err.slice(0, 500));
+    throw new Error(`OpenAI transcription failed (status ${response.status})`);
   }
 
   const result = await response.json();
@@ -137,12 +139,14 @@ export async function transcribeAudioGroqFallback(
         Authorization: `Bearer ${groqKey}`,
       },
       body: formData,
+      signal: AbortSignal.timeout(25000),
     }
   );
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Groq fallback transcription failed: ${response.status} ${err}`);
+    console.error(`Groq transcription API error (${response.status}):`, err.slice(0, 500));
+    throw new Error(`Groq fallback transcription failed (status ${response.status})`);
   }
 
   const result = await response.json();
@@ -213,6 +217,7 @@ export async function generateDocuments(opts: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    signal: AbortSignal.timeout(50000),
     body: JSON.stringify({
       model: modelId,
       messages: [
@@ -293,7 +298,8 @@ Generate the appropriate FAA compliance documents based on this evidence.`,
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`OpenAI document generation failed: ${response.status} ${err}`);
+    console.error(`OpenAI document generation API error (${response.status}):`, err.slice(0, 500));
+    throw new Error(`OpenAI document generation failed (status ${response.status})`);
   }
 
   const result = await response.json();

@@ -22,8 +22,6 @@ export async function POST(request: Request) {
     let audioFile: File | Blob;
     let fileName: string;
     let evidenceId: string | null = null;
-    let sessionId: string | null = null;
-    let chunkIndex: string | null = null;
 
     const contentType = request.headers.get("content-type") || "";
 
@@ -32,8 +30,6 @@ export async function POST(request: Request) {
       const body = await request.json();
       const { audioBlobUrl, fileName: bodyFileName, mimeType } = body;
       evidenceId = body.evidenceId || null;
-      sessionId = body.sessionId || null;
-      chunkIndex = body.chunkIndex || null;
 
       if (!audioBlobUrl) {
         return NextResponse.json(
@@ -59,8 +55,6 @@ export async function POST(request: Request) {
       const formData = await request.formData();
       const formFile = formData.get("file") as File | null;
       evidenceId = formData.get("evidenceId") as string | null;
-      sessionId = formData.get("sessionId") as string | null;
-      chunkIndex = formData.get("chunkIndex") as string | null;
 
       if (!formFile) {
         return NextResponse.json(
@@ -89,33 +83,11 @@ export async function POST(request: Request) {
       });
     }
 
-    // If we have a sessionId and chunkIndex, stitch into full session transcript
-    // The full transcript is built by appending each chunk's text with timestamps
-    if (sessionId && chunkIndex !== null) {
-      const session = await prisma.captureSession.findUnique({
-        where: { id: sessionId },
-        select: { description: true },
-      });
-
-      // We store the stitched transcript fragments in a simple format
-      // Each chunk gets appended with a time marker
-      if (session && result.text.trim()) {
-        const chunkNum = parseInt(chunkIndex) || 0;
-        const timeOffset = chunkNum * 120; // Each chunk is ~2 minutes
-        const marker = `[${formatTime(timeOffset)}] `;
-        const existingDesc = session.description || "";
-        const separator = existingDesc ? "\n" : "";
-
-        // Append this chunk's transcript to the session description
-        // (In production, this would be a dedicated fullTranscript field)
-        await prisma.captureSession.update({
-          where: { id: sessionId },
-          data: {
-            description: existingDesc + separator + marker + result.text.trim(),
-          },
-        });
-      }
-    }
+    // NOTE: Real-time transcript stitching was removed to prevent race conditions.
+    // When multiple chunks are transcribed concurrently, read-then-write to session
+    // description caused chunks to overwrite each other. The pipeline's single-pass
+    // stitching (in lib/ai/pipeline.ts) is now the sole source of truth for the
+    // full transcript, processing all chunks at once after the session ends.
 
     // Audit log
     await prisma.auditLogEntry.create({
@@ -153,11 +125,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
-
-// Format seconds as MM:SS for transcript time markers
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
