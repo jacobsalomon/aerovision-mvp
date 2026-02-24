@@ -4,6 +4,9 @@
 // Called automatically after each video chunk upload during capture
 // Protected by API key authentication
 
+// Allow up to 60 seconds for Gemini video annotation
+export const maxDuration = 60;
+
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import {

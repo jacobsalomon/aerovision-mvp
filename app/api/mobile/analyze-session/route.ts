@@ -4,6 +4,9 @@
 // Produces detailed action log, part identification, procedure verification
 // Protected by API key authentication
 
+// Allow up to 60 seconds for Gemini video upload + analysis
+export const maxDuration = 60;
+
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
 import {
