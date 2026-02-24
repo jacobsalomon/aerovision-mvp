@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
+        signal: AbortSignal.timeout(25000),
         body: JSON.stringify({
           model: "claude-sonnet-4-5-20250929",
           max_tokens: 4096,
@@ -64,6 +65,13 @@ ${JSON.stringify(body, null, 2)}`,
           ],
         }),
       });
+
+      // Check for API errors before parsing
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        console.error(`Anthropic API error (status ${response.status}): ${errorBody.slice(0, 200)}`);
+        throw new Error(`Anthropic API returned status ${response.status}`);
+      }
 
       const aiResult = await response.json();
       // Extract the text content from Claude's response

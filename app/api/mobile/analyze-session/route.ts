@@ -9,6 +9,7 @@ export const maxDuration = 60;
 
 import { prisma } from "@/lib/db";
 import { authenticateRequest } from "@/lib/mobile-auth";
+import { clampConfidence } from "@/lib/ai/utils";
 import {
   uploadFileToGemini,
   waitForFileProcessing,
@@ -21,9 +22,18 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if ("error" in auth) return auth.error;
 
-  // Parse sessionId outside try so catch block can reset status on error
-  const body = await request.json();
-  const { sessionId } = body;
+  // Parse request body with its own error handling so malformed JSON
+  // returns 400 instead of crashing and leaving the session stuck
+  let sessionId: string;
+  try {
+    const body = await request.json();
+    sessionId = body.sessionId;
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Invalid request body" },
+      { status: 400 }
+    );
+  }
 
   if (!sessionId) {
     return NextResponse.json(
@@ -168,7 +178,7 @@ export async function POST(request: Request) {
         partsIdentified: JSON.stringify(analysis.partsIdentified),
         procedureSteps: JSON.stringify(analysis.procedureSteps),
         anomalies: JSON.stringify(analysis.anomalies),
-        confidence: analysis.confidence,
+        confidence: clampConfidence(analysis.confidence),
         modelUsed: process.env.VIDEO_ANALYSIS_MODEL || "gemini-2.5-flash",
         costEstimate,
         processingTime,

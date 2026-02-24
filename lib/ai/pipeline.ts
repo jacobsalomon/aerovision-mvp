@@ -16,8 +16,7 @@ import {
   deleteGeminiFile,
 } from "./gemini";
 import { generateDocuments } from "./openai";
-import { readFile } from "fs/promises";
-import path from "path";
+import { clampConfidence } from "./utils";
 
 export interface PipelineResult {
   sessionId: string;
@@ -85,13 +84,15 @@ export async function runSessionPipeline(
     );
 
     if (audioChunks.length > 0) {
-      // Build full transcript with time markers
+      // Build full transcript with time markers using actual chunk durations
+      let cumulativeSeconds = 0;
       const fullTranscript = audioChunks
-        .map((chunk, i) => {
-          const timeOffset = i * 120; // Each chunk is ~2 min
-          const minutes = Math.floor(timeOffset / 60);
-          const seconds = timeOffset % 60;
+        .map((chunk) => {
+          const minutes = Math.floor(cumulativeSeconds / 60);
+          const seconds = Math.floor(cumulativeSeconds % 60);
           const marker = `[${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}]`;
+          // Advance by actual chunk duration (fall back to 120s if unknown)
+          cumulativeSeconds += chunk.durationSeconds ?? 120;
           return `${marker} ${chunk.transcription}`;
         })
         .join("\n");
@@ -133,10 +134,13 @@ export async function runSessionPipeline(
       });
 
       if (!existingAnalysis) {
-        // Use the first/largest video
+        // Use the first/largest video — download from Vercel Blob URL
         const video = videoEvidence[0];
-        const filePath = path.join(process.cwd(), "public", video.fileUrl);
-        const fileBuffer = await readFile(filePath);
+        const videoResponse = await fetch(video.fileUrl);
+        if (!videoResponse.ok) {
+          throw new Error(`Could not download video file (status ${videoResponse.status})`);
+        }
+        const fileBuffer = Buffer.from(await videoResponse.arrayBuffer());
 
         // Upload to Gemini
         const uploadedFile = await uploadFileToGemini(
@@ -159,10 +163,13 @@ export async function runSessionPipeline(
             });
             if (cmm) {
               try {
-                const cmmPath = cmm.fileUrl.startsWith("/")
-                  ? path.join(process.cwd(), "public", cmm.fileUrl)
-                  : cmm.fileUrl;
-                cmmContent = await readFile(cmmPath, "utf-8");
+                // Download CMM content from Vercel Blob URL
+                const cmmResponse = await fetch(cmm.fileUrl);
+                if (cmmResponse.ok) {
+                  cmmContent = await cmmResponse.text();
+                } else {
+                  console.warn(`Pipeline: CMM download failed (status ${cmmResponse.status})`);
+                }
               } catch {
                 console.warn("Pipeline: Could not load CMM file");
               }
@@ -190,7 +197,7 @@ export async function runSessionPipeline(
             partsIdentified: JSON.stringify(analysis.partsIdentified),
             procedureSteps: JSON.stringify(analysis.procedureSteps),
             anomalies: JSON.stringify(analysis.anomalies),
-            confidence: analysis.confidence,
+            confidence: clampConfidence(analysis.confidence),
             modelUsed: process.env.VIDEO_ANALYSIS_MODEL || "gemini-2.5-flash",
             costEstimate: analysisCost,
             processingTime: Date.now() - pipelineStart,
@@ -337,7 +344,7 @@ export async function runSessionPipeline(
           documentType: doc.documentType,
           contentJson: JSON.stringify(doc.contentJson),
           status: "draft",
-          confidence: doc.confidence || 0,
+          confidence: clampConfidence(doc.confidence),
           lowConfidenceFields: JSON.stringify(doc.lowConfidenceFields || []),
         },
       });
