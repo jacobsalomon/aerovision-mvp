@@ -1,10 +1,11 @@
 "use client";
 
 // Capture Sessions dashboard — lists all mobile capture sessions
-// Shows session status, technician, evidence count, document count
-// Supervisors can review and approve generated documents here
+// Two tabs: "All Sessions" and "Review Queue" (pending supervisor review)
+// Rows are clickable — navigate to /sessions/[id] for full detail
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -66,10 +67,15 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
 };
 
+// Statuses that count as "needs review"
+const REVIEW_STATUSES = ["documents_generated", "submitted"];
+
 export default function SessionsPage() {
+  const router = useRouter();
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState<"all" | "review">("all");
 
   useEffect(() => {
     async function fetchSessions() {
@@ -107,15 +113,21 @@ export default function SessionsPage() {
     return `${m}m ${s}s`;
   }
 
-  // Summary stats
+  // Summary stats (computed from all sessions, not filtered by tab)
   const totalSessions = sessions.length;
   const activeSessions = sessions.filter(
     (s) => s.status === "capturing" || s.status === "processing"
   ).length;
   const pendingReview = sessions.filter(
-    (s) => s.status === "documents_generated" || s.status === "submitted"
+    (s) => REVIEW_STATUSES.includes(s.status)
   ).length;
   const totalEvidence = sessions.reduce((sum, s) => sum + s._count.evidence, 0);
+
+  // Filter sessions by active tab
+  const displayedSessions =
+    activeTab === "review"
+      ? sessions.filter((s) => REVIEW_STATUSES.includes(s.status))
+      : sessions;
 
   return (
     <div>
@@ -167,36 +179,93 @@ export default function SessionsPage() {
         </Card>
       </div>
 
-      {/* Filter + table */}
+      {/* Tab bar + filter + table */}
       <Card className="border-0 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-bold" style={{ fontFamily: 'var(--font-space-grotesk)', color: 'rgb(20, 20, 20)' }}>All Sessions</CardTitle>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="capturing">Capturing</SelectItem>
-              <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="documents_generated">Docs Ready</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
+        <CardHeader className="flex flex-col gap-4">
+          {/* Tab bar */}
+          <div className="flex gap-1 border-b" style={{ borderColor: 'rgb(230, 230, 230)' }}>
+            <button
+              onClick={() => setActiveTab("all")}
+              className="px-4 py-2.5 text-sm font-medium transition-colors relative"
+              style={{
+                color: activeTab === "all" ? "rgb(20, 20, 20)" : "rgb(140, 140, 140)",
+              }}
+            >
+              All Sessions
+              {activeTab === "all" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor: 'rgb(20, 20, 20)' }} />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("review")}
+              className="px-4 py-2.5 text-sm font-medium transition-colors relative flex items-center gap-2"
+              style={{
+                color: activeTab === "review" ? "rgb(20, 20, 20)" : "rgb(140, 140, 140)",
+              }}
+            >
+              Review Queue
+              {pendingReview > 0 && (
+                <span
+                  className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-xs font-bold"
+                  style={{
+                    backgroundColor: activeTab === "review" ? "rgb(147, 51, 234)" : "rgb(220, 220, 220)",
+                    color: activeTab === "review" ? "white" : "rgb(80, 80, 80)",
+                  }}
+                >
+                  {pendingReview}
+                </span>
+              )}
+              {activeTab === "review" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5" style={{ backgroundColor: 'rgb(20, 20, 20)' }} />
+              )}
+            </button>
+          </div>
+
+          {/* Filter row — only shown on "All Sessions" tab */}
+          {activeTab === "all" && (
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-bold" style={{ fontFamily: 'var(--font-space-grotesk)', color: 'rgb(20, 20, 20)' }}>
+                {statusFilter === "all" ? "All Sessions" : STATUS_LABELS[statusFilter] || statusFilter}
+              </CardTitle>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="capturing">Capturing</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="documents_generated">Docs Ready</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {activeTab === "review" && (
+            <CardTitle className="text-lg font-bold" style={{ fontFamily: 'var(--font-space-grotesk)', color: 'rgb(20, 20, 20)' }}>
+              Sessions Awaiting Review
+            </CardTitle>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
             </div>
-          ) : sessions.length === 0 ? (
+          ) : displayedSessions.length === 0 ? (
             <div className="text-center py-12" style={{ color: 'rgb(140, 140, 140)' }}>
               <Smartphone className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">No capture sessions yet</p>
+              <p className="text-sm">
+                {activeTab === "review"
+                  ? "No sessions awaiting review"
+                  : "No capture sessions yet"}
+              </p>
               <p className="text-xs mt-1">
-                Sessions appear here when technicians use the AeroVision Capture app
+                {activeTab === "review"
+                  ? "Sessions appear here when technicians submit completed work"
+                  : "Sessions appear here when technicians use the AeroVision Capture app"}
               </p>
             </div>
           ) : (
@@ -212,8 +281,19 @@ export default function SessionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sessions.map((session) => (
-                  <TableRow key={session.id}>
+                {displayedSessions.map((session) => (
+                  <TableRow
+                    key={session.id}
+                    className="cursor-pointer transition-colors"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => router.push(`/sessions/${session.id}`)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgb(248, 248, 248)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "";
+                    }}
+                  >
                     <TableCell>
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${

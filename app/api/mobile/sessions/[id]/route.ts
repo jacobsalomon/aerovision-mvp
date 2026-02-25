@@ -19,8 +19,12 @@ export async function GET(
   const session = await prisma.captureSession.findUnique({
     where: { id },
     include: {
-      evidence: { orderBy: { capturedAt: "asc" } },
+      evidence: {
+        orderBy: { capturedAt: "asc" },
+        include: { videoAnnotations: { orderBy: { timestamp: "asc" } } },
+      },
       documents: { orderBy: { generatedAt: "desc" } },
+      analysis: true,
     },
   });
 
