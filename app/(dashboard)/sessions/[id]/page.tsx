@@ -111,6 +111,7 @@ interface AuditEntry {
 
 const STATUS_COLORS: Record<string, string> = {
   capturing: "bg-blue-100 text-blue-700",
+  capture_complete: "bg-cyan-100 text-cyan-700",
   processing: "bg-amber-100 text-amber-700",
   documents_generated: "bg-emerald-100 text-emerald-700",
   submitted: "bg-purple-100 text-purple-700",
@@ -122,6 +123,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   capturing: "Capturing",
+  capture_complete: "Capture Complete",
   processing: "Processing",
   documents_generated: "Docs Ready",
   submitted: "Submitted",
