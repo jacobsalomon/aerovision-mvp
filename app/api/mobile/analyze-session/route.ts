@@ -153,10 +153,12 @@ export async function POST(request: Request) {
     }
 
     // Step 4: Run deep analysis with Gemini 2.5 Flash
+    // Priority: CMM > expected steps > AI-inferred
     const analysis = await analyzeSessionVideo(
       processedFile.uri,
       videoEvidence.mimeType,
-      cmmContent
+      cmmContent,
+      session.expectedSteps || undefined
     );
 
     const processingTime = Date.now() - startTime;
@@ -179,6 +181,7 @@ export async function POST(request: Request) {
         procedureSteps: JSON.stringify(analysis.procedureSteps),
         anomalies: JSON.stringify(analysis.anomalies),
         confidence: clampConfidence(analysis.confidence),
+        verificationSource: analysis.verificationSource,
         modelUsed: process.env.VIDEO_ANALYSIS_MODEL || "gemini-2.5-flash",
         costEstimate,
         processingTime,
@@ -207,6 +210,7 @@ export async function POST(request: Request) {
           costEstimate,
           processingTime,
           hadCmmContext: !!cmmContent,
+          verificationSource: analysis.verificationSource,
         }),
       },
     });

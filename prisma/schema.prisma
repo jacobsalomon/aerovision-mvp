@@ -301,6 +301,7 @@ model CaptureSession {
   componentId     String?                               // Linked after AI identifies the part
   status          String    @default("capturing")       // capturing, processing, documents_generated, submitted, approved, rejected
   description     String?
+  expectedSteps   String?                               // Free-text SOP — expected maintenance steps for this session
   startedAt       DateTime  @default(now())
   completedAt     DateTime?
   createdAt       DateTime  @default(now())
@@ -376,6 +377,7 @@ model SessionAnalysis {
   procedureSteps  String                                // JSON — maintenance steps identified
   anomalies       String   @default("[]")               // JSON — any concerns or anomalies spotted
   confidence      Float    @default(0)                  // 0-1 overall confidence
+  verificationSource String?                            // "cmm", "expected_steps", or "ai_inferred" — what the AI verified steps against
   modelUsed       String                                // e.g., "gemini-2.5-flash"
   rawResponse     String?                               // Full AI response for debugging
   costEstimate    Float?                                // Estimated API cost in dollars
