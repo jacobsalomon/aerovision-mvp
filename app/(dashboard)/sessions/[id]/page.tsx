@@ -33,6 +33,18 @@ import {
   FileCheck,
   FilePlus2,
   Sparkles,
+  Wrench,
+  Search,
+  CirclePlus,
+  CircleMinus,
+  CirclePlay,
+  Droplet,
+  Hammer,
+  BookOpen,
+  ExternalLink,
+  ArrowRightLeft,
+  Info,
+  AlertCircle,
 } from "lucide-react";
 
 // ─── Types ─────────────────────────────────────────────────────────────
@@ -78,15 +90,45 @@ interface SessionAnalysis {
   procedureSteps: string;
   anomalies: string;
   confidence: number;
+  verificationSource: string | null;
   modelUsed: string;
   processingTime: number | null;
   costEstimate: number | null;
+}
+
+// Parsed types for structured AI analysis data
+interface ParsedActionLogEntry {
+  timestamp: number;
+  action: string;
+  details?: string;
+}
+
+interface ParsedPart {
+  partNumber: string;
+  serialNumber?: string;
+  description: string;
+  confidence: number;
+}
+
+interface ParsedProcedureStep {
+  stepNumber: number;
+  description: string;
+  completed: boolean;
+  cmmReference?: string;
+}
+
+interface ParsedAnomaly {
+  description: string;
+  severity: "info" | "warning" | "critical";
+  timestamp?: number;
 }
 
 interface SessionDetail {
   id: string;
   status: string;
   description: string | null;
+  componentId: string | null;
+  expectedSteps: string | null;
   startedAt: string;
   completedAt: string | null;
   technician: {
@@ -225,6 +267,12 @@ export default function SessionDetailPage() {
   const [creatingDoc, setCreatingDoc] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // Expected Steps (SOP) editing state
+  const [expectedStepsText, setExpectedStepsText] = useState("");
+  const [expectedStepsEditing, setExpectedStepsEditing] = useState(false);
+  const [expectedStepsSaving, setExpectedStepsSaving] = useState(false);
+  const [expectedStepsSaved, setExpectedStepsSaved] = useState(false);
+
   const fetchSession = useCallback(async () => {
     try {
       const res = await fetch(apiUrl(`/api/sessions/${sessionId}`));
@@ -241,6 +289,35 @@ export default function SessionDetailPage() {
   useEffect(() => {
     fetchSession();
   }, [fetchSession]);
+
+  // Sync expected steps text when session loads
+  useEffect(() => {
+    if (session?.expectedSteps !== undefined) {
+      setExpectedStepsText(session.expectedSteps || "");
+    }
+  }, [session?.expectedSteps]);
+
+  // Save expected steps to the backend
+  async function handleSaveExpectedSteps() {
+    setExpectedStepsSaving(true);
+    setExpectedStepsSaved(false);
+    try {
+      const res = await fetch(apiUrl(`/api/sessions/${sessionId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedSteps: expectedStepsText || null }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      await fetchSession();
+      setExpectedStepsEditing(false);
+      setExpectedStepsSaved(true);
+      setTimeout(() => setExpectedStepsSaved(false), 3000);
+    } catch (err) {
+      console.error("Failed to save expected steps:", err);
+    } finally {
+      setExpectedStepsSaving(false);
+    }
+  }
 
   // Fetch audit trail when expanded
   useEffect(() => {
@@ -344,12 +421,24 @@ export default function SessionDetailPage() {
     .map((a) => a.transcription)
     .join("\n\n");
 
-  // Parse analysis fields
+  // Parse analysis fields — these arrive as JSON strings from Prisma
   const analysis = session.analysis;
-  const actionLog = safeParseJson(analysis?.actionLog ?? null) as Array<{ timestamp?: string; action?: string; description?: string }> | null;
-  const partsIdentified = safeParseJson(analysis?.partsIdentified ?? null) as string[] | null;
-  const procedureSteps = safeParseJson(analysis?.procedureSteps ?? null) as string[] | null;
-  const anomalies = safeParseJson(analysis?.anomalies ?? null) as string[] | null;
+  const actionLog = safeParseJson(analysis?.actionLog ?? null) as ParsedActionLogEntry[] | null;
+  const partsIdentified = safeParseJson(analysis?.partsIdentified ?? null) as ParsedPart[] | null;
+  const procedureSteps = safeParseJson(analysis?.procedureSteps ?? null) as ParsedProcedureStep[] | null;
+  const anomalies = safeParseJson(analysis?.anomalies ?? null) as ParsedAnomaly[] | null;
+
+  // Compute session duration for summary
+  const sessionDurationMs = session.completedAt
+    ? new Date(session.completedAt).getTime() - new Date(session.startedAt).getTime()
+    : null;
+  const sessionDurationStr = sessionDurationMs
+    ? `${Math.round(sessionDurationMs / 60000)} min`
+    : "In progress";
+
+  // Count completed procedure steps
+  const completedSteps = procedureSteps?.filter((s) => s.completed).length ?? 0;
+  const totalSteps = procedureSteps?.length ?? 0;
 
   return (
     <div>
@@ -461,7 +550,86 @@ export default function SessionDetailPage() {
             {session.description}
           </p>
         )}
+        {session.componentId && (
+          <Link
+            href={`/parts/${session.componentId}`}
+            className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium hover:underline"
+            style={{ color: "rgb(59, 130, 246)" }}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View Linked Component
+          </Link>
+        )}
       </div>
+
+      {/* ═══ EXPECTED STEPS (SOP) ═══ */}
+      <Card className="border-0 shadow-sm mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: "var(--font-space-grotesk)", color: "rgb(20, 20, 20)" }}>
+              <BookOpen className="h-5 w-5" /> Expected Steps (SOP)
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {expectedStepsSaved && (
+                <span className="text-xs font-medium flex items-center gap-1" style={{ color: "rgb(34, 197, 94)" }}>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+                </span>
+              )}
+              {!expectedStepsEditing ? (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setExpectedStepsEditing(true)}>
+                  Edit
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setExpectedStepsEditing(false);
+                      setExpectedStepsText(session.expectedSteps || "");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={expectedStepsSaving}
+                    onClick={handleSaveExpectedSteps}
+                    className="gap-1.5"
+                  >
+                    {expectedStepsSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {expectedStepsEditing ? (
+            <div>
+              <Textarea
+                value={expectedStepsText}
+                onChange={(e) => setExpectedStepsText(e.target.value)}
+                placeholder={"Define the expected maintenance steps for this session...\n\nExample:\n1. Remove hydraulic pump from aircraft\n2. Perform receiving inspection\n3. Disassemble per CMM 29-10-01\n4. Inspect all bearings and seals\n5. Replace worn components\n6. Reassemble and torque to spec\n7. Functional test at 3000 PSI\n8. Final inspection and documentation"}
+                rows={8}
+                className="text-sm font-mono"
+              />
+              <p className="text-xs mt-2" style={{ color: "rgb(140, 140, 140)" }}>
+                When no CMM is linked, the AI will verify the technician&apos;s work against these steps instead of guessing.
+              </p>
+            </div>
+          ) : session.expectedSteps ? (
+            <div className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "rgb(60, 60, 60)" }}>
+              {session.expectedSteps}
+            </div>
+          ) : (
+            <p className="text-sm text-center py-4" style={{ color: "rgb(160, 160, 160)" }}>
+              No expected steps defined. Click &quot;Edit&quot; to add an SOP for this session.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ═══ EVIDENCE GALLERY ═══ */}
       <Card className="border-0 shadow-sm mb-6">
@@ -618,85 +786,438 @@ export default function SessionDetailPage() {
         </CardContent>
       </Card>
 
-      {/* ═══ AI ANALYSIS ═══ */}
+      {/* ═══ SESSION SUMMARY ═══ */}
       {analysis && (
         <Card className="border-0 shadow-sm mb-6">
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: "var(--font-space-grotesk)", color: "rgb(20, 20, 20)" }}>
-              <Brain className="h-5 w-5" /> AI Analysis
+              <Sparkles className="h-5 w-5" /> Session Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Meta info */}
-            <div className="flex flex-wrap gap-4 mb-6 text-xs" style={{ color: "rgb(120, 120, 120)" }}>
-              <span className="flex items-center gap-1">
-                Confidence:
-                <span className="font-bold" style={{ color: confidenceColor(analysis.confidence) }}>
-                  {Math.round(analysis.confidence * 100)}%
-                </span>
-              </span>
-              <span>Model: {analysis.modelUsed}</span>
-              {analysis.processingTime && <span>Processing: {(analysis.processingTime / 1000).toFixed(1)}s</span>}
-              {analysis.costEstimate && <span>Cost: ${analysis.costEstimate.toFixed(3)}</span>}
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Parts identified */}
-              {partsIdentified && partsIdentified.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2" style={{ color: "rgb(60, 60, 60)" }}>Parts Identified</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {partsIdentified.map((part, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: "rgb(230, 245, 230)", color: "rgb(30, 100, 30)" }}>
-                        {String(part)}
-                      </span>
-                    ))}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {/* Duration */}
+              <div className="rounded-lg p-4" style={{ backgroundColor: "rgb(248, 250, 252)" }}>
+                <p className="text-xs font-medium mb-1" style={{ color: "rgb(120, 120, 120)" }}>Duration</p>
+                <p className="text-lg font-bold" style={{ color: "rgb(20, 20, 20)" }}>{sessionDurationStr}</p>
+              </div>
+              {/* Evidence */}
+              <div className="rounded-lg p-4" style={{ backgroundColor: "rgb(248, 250, 252)" }}>
+                <p className="text-xs font-medium mb-1" style={{ color: "rgb(120, 120, 120)" }}>Evidence</p>
+                <p className="text-lg font-bold" style={{ color: "rgb(20, 20, 20)" }}>{session.evidence.length} items</p>
+                <p className="text-xs mt-0.5" style={{ color: "rgb(120, 120, 120)" }}>
+                  {photos.length} photo{photos.length !== 1 ? "s" : ""}, {videos.length} video{videos.length !== 1 ? "s" : ""}, {audioChunks.length} audio
+                </p>
+              </div>
+              {/* Procedure Steps */}
+              {totalSteps > 0 && (
+                <div className="rounded-lg p-4" style={{ backgroundColor: "rgb(248, 250, 252)" }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: "rgb(120, 120, 120)" }}>Steps Completed</p>
+                  <p className="text-lg font-bold" style={{ color: completedSteps === totalSteps ? "rgb(34, 197, 94)" : "rgb(20, 20, 20)" }}>
+                    {completedSteps}/{totalSteps}
+                  </p>
+                  <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgb(230, 230, 230)" }}>
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.round((completedSteps / totalSteps) * 100)}%`,
+                        backgroundColor: completedSteps === totalSteps ? "rgb(34, 197, 94)" : "rgb(59, 130, 246)",
+                      }}
+                    />
                   </div>
                 </div>
               )}
-
-              {/* Procedure steps */}
-              {procedureSteps && procedureSteps.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2" style={{ color: "rgb(60, 60, 60)" }}>Procedure Steps</h4>
-                  <ol className="list-decimal list-inside space-y-1 text-xs" style={{ color: "rgb(60, 60, 60)" }}>
-                    {procedureSteps.map((step, i) => (
-                      <li key={i}>{String(step)}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
+              {/* Anomalies */}
+              <div className="rounded-lg p-4" style={{ backgroundColor: "rgb(248, 250, 252)" }}>
+                <p className="text-xs font-medium mb-1" style={{ color: "rgb(120, 120, 120)" }}>Anomalies</p>
+                <p className="text-lg font-bold" style={{ color: anomalies && anomalies.length > 0 ? "rgb(239, 68, 68)" : "rgb(34, 197, 94)" }}>
+                  {anomalies?.length ?? 0}
+                </p>
+                {anomalies && anomalies.length > 0 && (
+                  <p className="text-xs mt-0.5" style={{ color: "rgb(120, 120, 120)" }}>
+                    {anomalies.filter((a) => a.severity === "critical").length} critical, {anomalies.filter((a) => a.severity === "warning").length} warning
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Action log timeline */}
+            {/* Work performed summary — from first 4 action log entries */}
             {actionLog && actionLog.length > 0 && (
-              <div className="mt-6">
-                <h4 className="text-sm font-semibold mb-3" style={{ color: "rgb(60, 60, 60)" }}>Action Log</h4>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {actionLog.map((entry, i) => (
-                    <div key={i} className="flex items-start gap-3 text-xs p-2 rounded" style={{ backgroundColor: "rgb(248, 248, 248)" }}>
-                      {entry.timestamp && (
-                        <span className="font-mono shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgb(235, 235, 235)", color: "rgb(80, 80, 80)" }}>
-                          {entry.timestamp}
-                        </span>
+              <div>
+                <h4 className="text-sm font-semibold mb-2" style={{ color: "rgb(60, 60, 60)" }}>Work Performed</h4>
+                <ul className="space-y-1 text-sm" style={{ color: "rgb(80, 80, 80)" }}>
+                  {actionLog.slice(0, 4).map((entry, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span style={{ color: "rgb(59, 130, 246)" }}>•</span>
+                      <span>{entry.action}</span>
+                    </li>
+                  ))}
+                  {actionLog.length > 4 && (
+                    <li className="text-xs" style={{ color: "rgb(140, 140, 140)" }}>
+                      +{actionLog.length - 4} more actions recorded
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {/* Parts identified badges */}
+            {partsIdentified && partsIdentified.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold mb-2" style={{ color: "rgb(60, 60, 60)" }}>Components Touched</h4>
+                <div className="flex flex-wrap gap-2">
+                  {partsIdentified.map((part, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: "rgb(230, 245, 230)", color: "rgb(30, 100, 30)" }}>
+                      {part.partNumber || String(part)}
+                      {typeof part === "object" && part.serialNumber && (
+                        <span className="opacity-70">/ {part.serialNumber}</span>
                       )}
-                      <span style={{ color: "rgb(60, 60, 60)" }}>{entry.action || entry.description || JSON.stringify(entry)}</span>
-                    </div>
+                    </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Anomalies */}
-            {anomalies && anomalies.length > 0 && (
+            {/* AI confidence */}
+            <div className="mt-4 flex items-center gap-2 text-sm" style={{ color: "rgb(100, 100, 100)" }}>
+              <Brain className="h-4 w-4" />
+              <span>AI Confidence:</span>
+              <span className="font-bold" style={{ color: confidenceColor(analysis.confidence) }}>
+                {Math.round(analysis.confidence * 100)}%
+              </span>
+              <span className="text-xs">({analysis.modelUsed})</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══ KEY EVENTS TIMELINE ═══ */}
+      {actionLog && actionLog.length > 0 && (
+        <Card className="border-0 shadow-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: "var(--font-space-grotesk)", color: "rgb(20, 20, 20)" }}>
+              <Clock className="h-5 w-5" /> Key Events ({actionLog.length + (anomalies?.length ?? 0)})
+            </CardTitle>
+            <p className="text-xs mt-1" style={{ color: "rgb(120, 120, 120)" }}>
+              Timestamped actions and anomalies observed by AI — click to expand
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {/* Merge action log + anomalies chronologically */}
+              {(() => {
+                const merged: Array<{ type: "action"; data: ParsedActionLogEntry } | { type: "anomaly"; data: ParsedAnomaly }> = [];
+                for (const entry of actionLog) {
+                  merged.push({ type: "action", data: entry });
+                }
+                for (const anomaly of (anomalies ?? [])) {
+                  merged.push({ type: "anomaly", data: anomaly });
+                }
+                merged.sort((a, b) => {
+                  const tsA = a.type === "action" ? a.data.timestamp : (a.data.timestamp ?? 0);
+                  const tsB = b.type === "action" ? b.data.timestamp : (b.data.timestamp ?? 0);
+                  return tsA - tsB;
+                });
+
+                return merged.map((item, i) => {
+                  const isAnomaly = item.type === "anomaly";
+                  const timestamp = isAnomaly ? (item.data.timestamp ?? 0) : (item.data as ParsedActionLogEntry).timestamp;
+                  const title = isAnomaly ? item.data.description : (item.data as ParsedActionLogEntry).action;
+                  const details = !isAnomaly ? (item.data as ParsedActionLogEntry).details : undefined;
+                  const severity = isAnomaly ? (item.data as ParsedAnomaly).severity : null;
+
+                  // Icon selection based on action text
+                  const getIcon = () => {
+                    if (isAnomaly) {
+                      if (severity === "critical") return <AlertTriangle className="h-4 w-4" />;
+                      if (severity === "warning") return <AlertCircle className="h-4 w-4" />;
+                      return <Info className="h-4 w-4" />;
+                    }
+                    const lower = title.toLowerCase();
+                    if (lower.includes("remov") || lower.includes("disassembl")) return <CircleMinus className="h-4 w-4" />;
+                    if (lower.includes("install") || lower.includes("reassembl")) return <CirclePlus className="h-4 w-4" />;
+                    if (lower.includes("inspect") || lower.includes("check") || lower.includes("examin")) return <Search className="h-4 w-4" />;
+                    if (lower.includes("test") || lower.includes("run")) return <CirclePlay className="h-4 w-4" />;
+                    if (lower.includes("clean") || lower.includes("flush")) return <Droplet className="h-4 w-4" />;
+                    if (lower.includes("repair") || lower.includes("weld")) return <Hammer className="h-4 w-4" />;
+                    if (lower.includes("replace") || lower.includes("swap")) return <ArrowRightLeft className="h-4 w-4" />;
+                    return <Wrench className="h-4 w-4" />;
+                  };
+
+                  const severityColors: Record<string, { bg: string; text: string; border: string }> = {
+                    info: { bg: "rgb(239, 246, 255)", text: "rgb(37, 99, 235)", border: "rgb(191, 219, 254)" },
+                    warning: { bg: "rgb(255, 251, 235)", text: "rgb(217, 119, 6)", border: "rgb(253, 224, 71)" },
+                    critical: { bg: "rgb(254, 242, 242)", text: "rgb(220, 38, 38)", border: "rgb(252, 165, 165)" },
+                  };
+                  const sev = severity ? severityColors[severity] : null;
+
+                  // Cross-reference: find parts mentioned in this action
+                  const relatedParts = !isAnomaly && partsIdentified
+                    ? partsIdentified.filter((p) => {
+                        const text = `${title} ${details || ""}`.toLowerCase();
+                        return text.includes(p.partNumber.toLowerCase()) ||
+                          (p.serialNumber && text.includes(p.serialNumber.toLowerCase())) ||
+                          text.includes(p.description.toLowerCase());
+                      })
+                    : [];
+
+                  return (
+                    <details key={i} className="group">
+                      <summary
+                        className="flex items-center gap-3 p-3 rounded-lg cursor-pointer list-none transition-colors hover:bg-slate-50"
+                        style={{
+                          backgroundColor: sev ? sev.bg : undefined,
+                          border: sev ? `1px solid ${sev.border}` : "1px solid rgb(240, 240, 240)",
+                          borderRadius: "10px",
+                        }}
+                      >
+                        {/* Timestamp pill */}
+                        <span className="font-mono text-xs font-bold shrink-0 px-2 py-0.5 rounded-md" style={{ backgroundColor: "rgb(240, 240, 240)", color: "rgb(100, 100, 100)" }}>
+                          {formatTimestamp(timestamp)}
+                        </span>
+
+                        {/* Icon */}
+                        <span
+                          className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full"
+                          style={{
+                            backgroundColor: sev ? `${sev.text}20` : "rgb(239, 246, 255)",
+                            color: sev ? sev.text : "rgb(59, 130, 246)",
+                          }}
+                        >
+                          {getIcon()}
+                        </span>
+
+                        {/* Title + severity badge */}
+                        <div className="flex-1 min-w-0">
+                          {severity && (
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded mb-0.5 mr-2" style={{ backgroundColor: `${sev!.text}20`, color: sev!.text }}>
+                              {severity}
+                            </span>
+                          )}
+                          <span className="text-sm font-medium" style={{ color: "rgb(30, 30, 30)" }}>
+                            {title}
+                          </span>
+                        </div>
+
+                        {/* Expand chevron */}
+                        {(details || relatedParts.length > 0) && (
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" style={{ color: "rgb(160, 160, 160)" }} />
+                        )}
+                      </summary>
+
+                      {/* Expanded details */}
+                      {(details || relatedParts.length > 0) && (
+                        <div className="ml-[88px] mt-1 mb-2 text-xs space-y-2" style={{ color: "rgb(100, 100, 100)" }}>
+                          {details && <p>{details}</p>}
+                          {relatedParts.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold" style={{ color: "rgb(120, 120, 120)" }}>Parts:</span>
+                              {relatedParts.map((part, pi) => (
+                                <span key={pi} className="px-1.5 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: "rgb(230, 245, 250)", color: "rgb(30, 100, 160)" }}>
+                                  {part.partNumber}{part.serialNumber ? ` / ${part.serialNumber}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </details>
+                  );
+                });
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══ PROCEDURE STEPS ═══ */}
+      {procedureSteps && procedureSteps.length > 0 && (
+        <Card className="border-0 shadow-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: "var(--font-space-grotesk)", color: "rgb(20, 20, 20)" }}>
+              <FileCheck className="h-5 w-5" /> Procedure Steps ({completedSteps}/{totalSteps})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Progress bar */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs mb-1" style={{ color: "rgb(120, 120, 120)" }}>
+                <span>{completedSteps} of {totalSteps} steps completed</span>
+                <span className="font-bold" style={{ color: completedSteps === totalSteps ? "rgb(34, 197, 94)" : "rgb(59, 130, 246)" }}>
+                  {Math.round((completedSteps / totalSteps) * 100)}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgb(230, 230, 230)" }}>
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.round((completedSteps / totalSteps) * 100)}%`,
+                    backgroundColor: completedSteps === totalSteps ? "rgb(34, 197, 94)" : "rgb(59, 130, 246)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Step list */}
+            <div className="space-y-0">
+              {procedureSteps.map((step, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-3 py-3"
+                  style={{
+                    borderTop: i > 0 ? "1px solid rgb(245, 245, 245)" : undefined,
+                  }}
+                >
+                  {/* Step number / checkmark */}
+                  <div
+                    className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
+                    style={{
+                      backgroundColor: step.completed ? "rgb(220, 252, 231)" : "rgb(241, 245, 249)",
+                      color: step.completed ? "rgb(34, 197, 94)" : "rgb(148, 163, 184)",
+                    }}
+                  >
+                    {step.completed ? "✓" : step.stepNumber || i + 1}
+                  </div>
+
+                  {/* Step content */}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm"
+                      style={{
+                        color: step.completed ? "rgb(30, 30, 30)" : "rgb(100, 100, 100)",
+                        fontWeight: step.completed ? 500 : 400,
+                      }}
+                    >
+                      {step.description || String(step)}
+                    </p>
+                    {step.cmmReference && (
+                      <p className="flex items-center gap-1 mt-1 text-xs" style={{ color: "rgb(140, 140, 140)" }}>
+                        <BookOpen className="h-3 w-3" />
+                        CMM: {step.cmmReference}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══ ANOMALIES ═══ */}
+      {anomalies && anomalies.length > 0 && (
+        <Card className="border-0 shadow-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: "var(--font-space-grotesk)", color: "rgb(180, 80, 0)" }}>
+              <AlertTriangle className="h-5 w-5" /> Anomalies ({anomalies.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {anomalies.map((anomaly, i) => {
+                const sevColors: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+                  critical: { bg: "rgb(254, 242, 242)", text: "rgb(220, 38, 38)", icon: <AlertTriangle className="h-4 w-4" /> },
+                  warning: { bg: "rgb(255, 251, 235)", text: "rgb(217, 119, 6)", icon: <AlertCircle className="h-4 w-4" /> },
+                  info: { bg: "rgb(239, 246, 255)", text: "rgb(37, 99, 235)", icon: <Info className="h-4 w-4" /> },
+                };
+                const sev = sevColors[anomaly.severity] || sevColors.info;
+
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3 rounded-lg border"
+                    style={{ backgroundColor: sev.bg, borderColor: `${sev.text}30` }}
+                  >
+                    <span style={{ color: sev.text }} className="shrink-0 mt-0.5">{sev.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: `${sev.text}15`, color: sev.text }}>
+                          {anomaly.severity}
+                        </span>
+                        {anomaly.timestamp !== undefined && anomaly.timestamp !== null && (
+                          <span className="text-xs font-mono" style={{ color: "rgb(140, 140, 140)" }}>
+                            at {formatTimestamp(anomaly.timestamp)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm" style={{ color: sev.text }}>
+                        {anomaly.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══ AI ANALYSIS META ═══ */}
+      {analysis && (
+        <Card className="border-0 shadow-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold flex items-center gap-2" style={{ fontFamily: "var(--font-space-grotesk)", color: "rgb(20, 20, 20)" }}>
+              <Brain className="h-5 w-5" /> AI Analysis Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs" style={{ color: "rgb(100, 100, 100)" }}>
+              <div>
+                <p className="font-semibold mb-0.5">Overall Confidence</p>
+                <p className="text-base font-bold" style={{ color: confidenceColor(analysis.confidence) }}>
+                  {Math.round(analysis.confidence * 100)}%
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold mb-0.5">Model Used</p>
+                <p className="text-sm" style={{ color: "rgb(40, 40, 40)" }}>{analysis.modelUsed}</p>
+              </div>
+              {analysis.processingTime && (
+                <div>
+                  <p className="font-semibold mb-0.5">Processing Time</p>
+                  <p className="text-sm" style={{ color: "rgb(40, 40, 40)" }}>{(analysis.processingTime / 1000).toFixed(1)}s</p>
+                </div>
+              )}
+              {analysis.costEstimate && (
+                <div>
+                  <p className="font-semibold mb-0.5">Estimated Cost</p>
+                  <p className="text-sm" style={{ color: "rgb(40, 40, 40)" }}>${analysis.costEstimate.toFixed(3)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Parts identified with details */}
+            {partsIdentified && partsIdentified.length > 0 && (
               <div className="mt-6">
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5" style={{ color: "rgb(180, 80, 0)" }}>
-                  <AlertTriangle className="h-4 w-4" /> Anomalies ({anomalies.length})
-                </h4>
-                <div className="space-y-2">
-                  {anomalies.map((item, i) => (
-                    <div key={i} className="text-xs p-3 rounded" style={{ backgroundColor: "rgb(255, 248, 240)", color: "rgb(140, 60, 0)" }}>
-                      {String(item)}
+                <h4 className="text-sm font-semibold mb-3" style={{ color: "rgb(60, 60, 60)" }}>Parts Identified ({partsIdentified.length})</h4>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {partsIdentified.map((part, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg border" style={{ borderColor: "rgb(230, 230, 230)" }}>
+                      <div className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full" style={{ backgroundColor: "rgb(230, 245, 230)", color: "rgb(30, 100, 30)" }}>
+                        <Wrench className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold" style={{ color: "rgb(30, 30, 30)" }}>
+                          {part.partNumber || String(part)}
+                        </p>
+                        {typeof part === "object" && (
+                          <>
+                            {part.serialNumber && (
+                              <p className="text-xs" style={{ color: "rgb(100, 100, 100)" }}>S/N: {part.serialNumber}</p>
+                            )}
+                            {part.description && (
+                              <p className="text-xs" style={{ color: "rgb(100, 100, 100)" }}>{part.description}</p>
+                            )}
+                            {part.confidence !== undefined && (
+                              <p className="text-xs mt-1">
+                                <span style={{ color: confidenceColor(part.confidence) }} className="font-medium">
+                                  {Math.round(part.confidence * 100)}% confidence
+                                </span>
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

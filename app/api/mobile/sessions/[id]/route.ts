@@ -1,5 +1,5 @@
 // GET /api/mobile/sessions/[id] — Get session details with evidence and documents
-// PATCH /api/mobile/sessions/[id] — Update session (status, description, componentId)
+// PATCH /api/mobile/sessions/[id] — Update session (status, description, componentId, expectedSteps)
 // Protected by API key authentication
 
 import { prisma } from "@/lib/db";
@@ -76,7 +76,7 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { status, description, componentId } = body;
+    const { status, description, componentId, expectedSteps } = body;
 
     // Validate status against allowed values (must match all statuses used by mobile app + results screen)
     const validStatuses = ["capturing", "capture_complete", "processing", "documents_generated", "completed", "failed", "cancelled"];
@@ -91,6 +91,7 @@ export async function PATCH(
     if (status) updateData.status = status;
     if (description !== undefined) updateData.description = description;
     if (componentId !== undefined) updateData.componentId = componentId;
+    if (expectedSteps !== undefined) updateData.expectedSteps = expectedSteps;
 
     // If moving to "processing" or beyond, set completedAt
     if (status && status !== "capturing" && !session.completedAt) {

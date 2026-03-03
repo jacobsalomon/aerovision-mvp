@@ -1,9 +1,10 @@
 // GET /api/sessions/[id] — Full session detail for the web dashboard
+// PATCH /api/sessions/[id] — Update session fields (expectedSteps, description)
 // Returns session with all relations: technician, organization, evidence
 // (with video annotations), documents (with reviewer), and analysis
 
 import { prisma } from "@/lib/db";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireDashboardAuth } from "@/lib/dashboard-auth";
 
 export async function GET(
@@ -60,4 +61,42 @@ export async function GET(
   }
 
   return NextResponse.json(session);
+}
+
+// Update session fields from the web dashboard (e.g. expectedSteps)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authError = requireDashboardAuth(request);
+  if (authError) return authError;
+
+  const { id } = await params;
+
+  const session = await prisma.captureSession.findUnique({ where: { id } });
+  if (!session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  try {
+    const body = await request.json();
+    const { expectedSteps, description } = body;
+
+    const updateData: Record<string, unknown> = {};
+    if (expectedSteps !== undefined) updateData.expectedSteps = expectedSteps;
+    if (description !== undefined) updateData.description = description;
+
+    const updated = await prisma.captureSession.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Update session error:", error);
+    return NextResponse.json(
+      { error: "Failed to update session" },
+      { status: 500 }
+    );
+  }
 }

@@ -240,8 +240,9 @@ Be thorough — this creates a permanent searchable index of maintenance footage
 export async function analyzeSessionVideo(
   fileUri: string,
   mimeType: string,
-  cmmContent?: string // Full CMM text loaded into context
-): Promise<DeepAnalysisResult> {
+  cmmContent?: string, // Full CMM text loaded into context
+  expectedSteps?: string // User-defined SOP steps (fallback when no CMM)
+): Promise<DeepAnalysisResult & { verificationSource: "cmm" | "expected_steps" | "ai_inferred" }> {
   const apiKey = getApiKey();
   const model = process.env.VIDEO_ANALYSIS_MODEL || "gemini-2.5-flash";
 
@@ -255,8 +256,11 @@ export async function analyzeSessionVideo(
     },
   ];
 
-  // If we have a CMM, include it as context
+  // Determine which verification source to use — priority: CMM > expected steps > AI-inferred
+  let verificationSource: "cmm" | "expected_steps" | "ai_inferred" = "ai_inferred";
+
   if (cmmContent) {
+    verificationSource = "cmm";
     parts.push({
       text: `COMPONENT MAINTENANCE MANUAL (CMM) REFERENCE:
 The following is the relevant maintenance manual for the component being worked on.
@@ -264,7 +268,33 @@ Use this to verify procedure compliance and identify specific step numbers.
 
 ${cmmContent}`,
     });
+  } else if (expectedSteps) {
+    verificationSource = "expected_steps";
+    parts.push({
+      text: `EXPECTED MAINTENANCE STEPS (SOP):
+The following steps were defined by the supervisor as the expected procedure for this job.
+Use these as the checklist to verify the technician's work. Map observed actions to these steps
+and flag any steps that appear incomplete or skipped.
+
+${expectedSteps}`,
+    });
   }
+
+  // Build the procedure steps instruction based on what reference is available
+  const procedureInstruction = cmmContent
+    ? `3. PROCEDURE STEPS — The maintenance steps performed, mapped to CMM references:
+   - Step number and description
+   - Whether it appears completed correctly
+   - The CMM section reference for each step`
+    : expectedSteps
+    ? `3. PROCEDURE STEPS — Verify the technician's work against the expected steps above:
+   - Map each expected step to what you observe in the video
+   - Mark each step as completed (true) or not observed (false)
+   - Use the expected step descriptions as the step descriptions`
+    : `3. PROCEDURE STEPS — The maintenance steps you can infer from the video:
+   - Step number and description of what was done
+   - Whether it appears completed correctly
+   - Note: no CMM or SOP was provided, so these are AI-inferred from observation`;
 
   parts.push({
     text: `You are a senior aerospace maintenance analyst reviewing video footage of maintenance work. Analyze this video in detail and provide a comprehensive report.
@@ -281,10 +311,7 @@ Your analysis must include:
    - Description of the component
    - Confidence in the identification
 
-3. PROCEDURE STEPS — The maintenance steps performed, mapped to CMM references if available:
-   - Step number and description
-   - Whether it appears completed correctly
-   - Any CMM section reference if a manual was provided
+${procedureInstruction}
 
 4. ANOMALIES — Anything concerning or noteworthy:
    - Any deviations from standard procedure
@@ -334,7 +361,8 @@ Be thorough and precise — this data feeds into FAA compliance documents.`,
   if (!text) throw new Error("No response from Gemini deep analysis");
 
   try {
-    return JSON.parse(text) as DeepAnalysisResult;
+    const parsed = JSON.parse(text) as DeepAnalysisResult;
+    return { ...parsed, verificationSource };
   } catch {
     console.error("Gemini returned non-JSON deep analysis:", text);
     // Return empty structure rather than crashing
@@ -344,6 +372,7 @@ Be thorough and precise — this data feeds into FAA compliance documents.`,
       procedureSteps: [],
       anomalies: [{ description: "AI returned unparseable response", severity: "warning" }],
       confidence: 0,
+      verificationSource,
     };
   }
 }
