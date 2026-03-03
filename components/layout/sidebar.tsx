@@ -12,6 +12,7 @@ import {
   Play,
   Smartphone,
   Users,
+  FileText,
 } from "lucide-react";
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/sessions", label: "Capture Sessions", icon: Smartphone },
   { href: "/capture", label: "Capture Tool", icon: ScanLine },
   { href: "/knowledge", label: "Knowledge Library", icon: BookOpen },
+  { href: "/forms", label: "Forms Library", icon: FileText },
   { href: "/integrity", label: "Integrity", icon: ShieldCheck },
   { href: "/technicians", label: "Technicians", icon: Users },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
