@@ -19,12 +19,12 @@ export interface ModelConfig {
 // ── Video Analysis Models (native video understanding) ──────────────
 export const VIDEO_MODELS: ModelConfig[] = [
   {
-    id: "gemini-3.1-pro-preview",
+    id: "gemini-2.5-pro",
     provider: "google",
-    displayName: "Gemini 3.1 Pro Preview",
+    displayName: "Gemini 2.5 Pro",
     inputCostPer1M: 1.25,
     outputCostPer1M: 10.0,
-    contextWindow: 2_000_000,
+    contextWindow: 1_000_000,
     supportsVideo: true,
     supportsJsonOutput: true,
   },
@@ -34,16 +34,6 @@ export const VIDEO_MODELS: ModelConfig[] = [
     displayName: "Gemini 2.5 Flash",
     inputCostPer1M: 0.25,
     outputCostPer1M: 1.5,
-    contextWindow: 1_000_000,
-    supportsVideo: true,
-    supportsJsonOutput: true,
-  },
-  {
-    id: "gemini-2.5-flash",
-    provider: "google",
-    displayName: "Gemini 2.5 Flash (legacy fallback)",
-    inputCostPer1M: 0.30,
-    outputCostPer1M: 2.5,
     contextWindow: 1_000_000,
     supportsVideo: true,
     supportsJsonOutput: true,
@@ -58,16 +48,6 @@ export const ANNOTATION_MODELS: ModelConfig[] = [
     displayName: "Gemini 2.5 Flash",
     inputCostPer1M: 0.25,
     outputCostPer1M: 1.5,
-    contextWindow: 1_000_000,
-    supportsVideo: true,
-    supportsJsonOutput: true,
-  },
-  {
-    id: "gemini-2.5-flash",
-    provider: "google",
-    displayName: "Gemini 2.5 Flash (legacy fallback)",
-    inputCostPer1M: 0.30,
-    outputCostPer1M: 2.5,
     contextWindow: 1_000_000,
     supportsVideo: true,
     supportsJsonOutput: true,
@@ -99,16 +79,6 @@ export const TRANSCRIPTION_MODELS: ModelConfig[] = [
 // ── Photo OCR Models ────────────────────────────────────────────────
 export const OCR_MODELS: ModelConfig[] = [
   {
-    id: "gpt-5.4",
-    provider: "openai",
-    displayName: "GPT-5.4",
-    inputCostPer1M: 2.50,
-    outputCostPer1M: 10.0,
-    contextWindow: 1_000_000,
-    supportsImages: true,
-    supportsJsonOutput: true,
-  },
-  {
     id: "gpt-4o",
     provider: "openai",
     displayName: "GPT-4o",
@@ -133,30 +103,30 @@ export const OCR_MODELS: ModelConfig[] = [
 // ── Document Generation Models ──────────────────────────────────────
 export const GENERATION_MODELS: ModelConfig[] = [
   {
-    id: "gpt-5.4",
+    id: "gpt-4o",
     provider: "openai",
-    displayName: "GPT-5.4",
+    displayName: "GPT-4o",
     inputCostPer1M: 2.50,
     outputCostPer1M: 10.0,
-    contextWindow: 1_000_000,
+    contextWindow: 128_000,
     supportsJsonOutput: true,
   },
   {
-    id: "claude-sonnet-4-6-20250217",
+    id: "claude-sonnet-4-6-20250514",
     provider: "anthropic",
     displayName: "Claude Sonnet 4.6",
     inputCostPer1M: 3.0,
     outputCostPer1M: 15.0,
-    contextWindow: 1_000_000,
+    contextWindow: 200_000,
     supportsJsonOutput: true,
   },
   {
-    id: "gemini-3.1-pro-preview",
+    id: "gemini-2.5-pro",
     provider: "google",
-    displayName: "Gemini 3.1 Pro Preview (fallback generation)",
+    displayName: "Gemini 2.5 Pro (fallback generation)",
     inputCostPer1M: 1.25,
     outputCostPer1M: 10.0,
-    contextWindow: 2_000_000,
+    contextWindow: 1_000_000,
     supportsJsonOutput: true,
   },
 ];
@@ -164,21 +134,21 @@ export const GENERATION_MODELS: ModelConfig[] = [
 // ── Document Verification Models ────────────────────────────────────
 export const VERIFICATION_MODELS: ModelConfig[] = [
   {
-    id: "claude-sonnet-4-6-20250217",
+    id: "claude-sonnet-4-6-20250514",
     provider: "anthropic",
     displayName: "Claude Sonnet 4.6",
     inputCostPer1M: 3.0,
     outputCostPer1M: 15.0,
-    contextWindow: 1_000_000,
+    contextWindow: 200_000,
     supportsJsonOutput: true,
   },
   {
-    id: "gpt-5.4",
+    id: "gpt-4o",
     provider: "openai",
-    displayName: "GPT-5.4 (fallback verification)",
+    displayName: "GPT-4o (fallback verification)",
     inputCostPer1M: 2.50,
     outputCostPer1M: 10.0,
-    contextWindow: 1_000_000,
+    contextWindow: 128_000,
     supportsJsonOutput: true,
   },
 ];
