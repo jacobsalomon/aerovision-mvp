@@ -1,6 +1,7 @@
 // Database connection singleton
 // Uses Turso (cloud SQLite) when TURSO_DATABASE_URL is set (production),
-// falls back to local SQLite file for local development.
+// otherwise respects DATABASE_URL (used by Prisma CLI) and finally falls
+// back to local SQLite for local development.
 //
 // Keep this module server-only without requiring the `server-only` package so
 // unit tests can run in environments that do not resolve it.
@@ -15,8 +16,13 @@ import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 
 function createPrismaClient() {
+  const databaseUrl =
+    process.env.TURSO_DATABASE_URL ??
+    process.env.DATABASE_URL ??
+    "file:./dev.db";
+
   const adapter = new PrismaLibSql({
-    url: process.env.TURSO_DATABASE_URL ?? "file:./dev.db",
+    url: databaseUrl,
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 
